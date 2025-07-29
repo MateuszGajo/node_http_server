@@ -1,0 +1,24 @@
+{
+  "name": "http_server_node",
+  "version": "1.0.0",
+  "main": "index.js",
+  "dependencies": {
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "ts-node app/main.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://git.codecrafters.io/91fc23b531e2cc40"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "@types/jest": "^30.0.0"
+  }
+}
