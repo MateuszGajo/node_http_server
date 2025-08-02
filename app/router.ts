@@ -112,23 +112,22 @@ export class Router {
 
 
     handleRequest(req: HttpRequest, socket: net.Socket) {
-        for (const handler of this.handlers) {
-            console.log(req.path, handler.normalizedPathRegex)
-            const match = req.path.match(handler.normalizedPathRegex);
 
-            console.log(match)
+        const response = new Response(req.version, socket);
+        for (const handler of this.handlers) {
+
+            const match = req.path.match(handler.normalizedPathRegex);
 
             if (match) {
                 const pathParams = this.extractParams(handler, req.path, match);
                 req.pathParam = pathParams;
 
-                const response = new Response(req.version, socket);
                 const context = {}
                 handler.callback(req, response, context);
                 return;
             }
         }
 
-        throw new Error("404");
+        response.status(404).send();
     }
 }

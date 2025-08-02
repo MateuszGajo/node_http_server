@@ -1,38 +1,31 @@
 import net from 'net';
+import { Parser } from './parser';
+import { Router } from './router';
 export class Server {
     private server?: net.Server;
     listen(address: string, port: number) {
-        console.log("how many times listen???")
         return new Promise((res, rej) => {
             this.server = net.createServer((socket) => {
 
                 socket.on('data', (chunk) => {
-                    // const parser = new Parser();
-                    // const request = parser.parse(chunk)
+                    const parser = new Parser();
+                    const request = parser.parse(chunk)
 
-                    // const router = new Router();
+                    const router = new Router();
 
-                    // router.addHandler("/", "GET", (req, resp, ctx) => {
-                    //     resp.status(200).send();
-                    // })
+                    router.addHandler("/", "GET", (req, resp, ctx) => {
+                        resp.status(200).send();
+                    })
 
-                    socket.write("HTTP/1.1 200 OK\r\n")
-                    // socket.
-                    socket.end()
-                    socket.destroy()
-
-
-                    // try {
-                    //     router.handleRequest(request, socket)
-                    // } catch (err) {
-                    //     socket.end();
-                    //     console.error(err);
-                    //     process.exit(0)
-                    // }
+                    try {
+                        router.handleRequest(request, socket)
+                    } catch (err) {
+                        socket.end();
+                        process.exit(0)
+                    }
                 })
                 socket.on("close", () => {
-                    socket.destroy()
-                    // this.server.close()
+                    socket.end();
                 })
 
             })
@@ -51,13 +44,9 @@ export class Server {
                 resolve();
                 return;
             }
-            console.log("lets close server????")
             this.server.close((err) => {
                 if (err) reject(err);
-                else {
-                    // console.log(this.server.)
-                    resolve()
-                }
+                else resolve()
             });
         });
     }
