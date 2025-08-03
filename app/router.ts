@@ -21,6 +21,7 @@ export class Response {
     res: HttpResponse;
     version: string;
     socket: net.Socket;
+    headers: Record<string, string>
 
     constructor(version: string, socket: net.Socket) {
         this.res = {
@@ -31,6 +32,7 @@ export class Response {
         }
         this.version = version
         this.socket = socket;
+        this.headers = {}
     }
 
     private getStatusMsg(status: number) {
@@ -54,7 +56,13 @@ export class Response {
     }
 
     text(text: string) {
+        if (!text) {
+            throw new Error("value is empty")
+        }
         this.res.text = text;
+
+        this.headers['Content-Length'] = String(text.length);
+        this.headers['Content-Type'] = 'text/plain'
 
         return this;
     }
@@ -66,7 +74,13 @@ export class Response {
     }
 
     send() {
-        const response = this.version + " " + this.res.status + " " + this.res.statusMsg + "\r\n\r\n"
+        let headersString = '\r\n'
+
+        for (const key in this.headers) {
+            headersString += key + ": "
+            headersString += this.headers[key] + "\r\n"
+        }
+        const response = this.version + " " + this.res.status + " " + this.res.statusMsg + headersString + "\r\n" + this.res.text;
 
         this.socket.write(response);
         this.socket.end()
@@ -88,7 +102,7 @@ export class Router {
         const keys: any[] = [];
         const regex = "^" + pattern.replace(/{([^/]+)}/g, (_, key) => {
             keys.push(key)
-            return "[^/]+"
+            return "([^/]+)";
         }) + "$";
         return {
             regex: new RegExp(regex),
@@ -107,7 +121,6 @@ export class Router {
         const { regex, keys } = this.normalizePath(path)
 
         this.handlers.push({ path, method, callback, normalizedPathRegex: regex, path_keys: keys })
-
     }
 
 
@@ -115,7 +128,6 @@ export class Router {
 
         const response = new Response(req.version, socket);
         for (const handler of this.handlers) {
-
             const match = req.path.match(handler.normalizedPathRegex);
 
             if (match) {

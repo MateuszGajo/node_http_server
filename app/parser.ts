@@ -18,9 +18,9 @@ export class Parser {
         body: ""
     };
 
-    bufferSplitByCRLF(data: Buffer<ArrayBufferLike>): Buffer<ArrayBufferLike>[] {
+    bufferSplitByCRLF(data: Buffer): Buffer[] {
         let start = 0
-        let el: Buffer<ArrayBufferLike>[] = []
+        let el: Buffer[] = []
         let i = 1
         for (i = 1; i < data.length; i++) {
             if (data[i - 1] == 13 && data[i] == 10) {
@@ -36,7 +36,7 @@ export class Parser {
     }
 
 
-    parse(data: Buffer<ArrayBufferLike>) {
+    parse(data: Buffer) {
         const bufferSplited = this.bufferSplitByCRLF(data);
 
         const requestLine = String(bufferSplited.shift());

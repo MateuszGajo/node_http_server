@@ -17,9 +17,15 @@ export class Server {
                         resp.status(200).send();
                     })
 
+                    router.addHandler("/echo/{str}", "GET", (req, resp, ctx) => {
+                        const echoStr = req.pathParam.str;
+                        resp.status(200).text(echoStr).send();
+                    })
+
                     try {
                         router.handleRequest(request, socket)
                     } catch (err) {
+                        console.log(err)
                         socket.end();
                         process.exit(0)
                     }
