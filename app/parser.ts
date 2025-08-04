@@ -4,8 +4,18 @@ export interface HttpRequest {
     version: string,
     headers: Record<string, string>,
     pathParam: Record<string, string>,
-    body: string;
+    body: Uint8Array<ArrayBufferLike>
 }
+
+export interface HttpResponse {
+    version: string,
+    status: string,
+    statusMsg: string,
+    headers: Record<string, string>,
+    pathParam: Record<string, string>,
+    body: Uint8Array<ArrayBufferLike>
+}
+
 
 export class Parser {
 
@@ -15,8 +25,18 @@ export class Parser {
         version: "",
         headers: {},
         pathParam: {},
-        body: ""
+        body: new Uint8Array(),
     };
+
+    response: HttpResponse = {
+        status: "",
+        statusMsg: "",
+        version: "",
+        headers: {},
+        pathParam: {},
+        body: new Uint8Array(),
+    };
+
 
     bufferSplitByCRLF(data: Buffer): Buffer[] {
         let start = 0
@@ -36,7 +56,7 @@ export class Parser {
     }
 
 
-    parse(data: Buffer) {
+    parseReq(data: Buffer) {
         const bufferSplited = this.bufferSplitByCRLF(data);
 
         const requestLine = String(bufferSplited.shift());
@@ -62,8 +82,46 @@ export class Parser {
         this.request.version = requestLineSplit[2]
 
         this.request.headers = headers;
-        this.request.body = String(body);
+        if (body) {
+            this.request.body = new Uint8Array(body.buffer, body.byteOffset, body.byteLength);
+        }
+
 
         return this.request
+    }
+
+    parseRes(data: Buffer) {
+        const bufferSplited = this.bufferSplitByCRLF(data);
+
+        const requestLine = String(bufferSplited.shift());
+        const headers: Record<string, string> = {};
+        while (true) {
+            let item = bufferSplited.shift()
+            if (item?.length == 0) {
+                break;
+            }
+
+            let keyValue = String(item).split(":").map(item => item.trim())
+            headers[keyValue[0]] = keyValue[1]
+        }
+        const body = bufferSplited.shift();
+
+        const requestLineSplit = requestLine.split(" ");
+        if (requestLineSplit.length != 3) {
+            throw new Error("request error line shoud contain method, path and version")
+        }
+
+        this.response.version = requestLineSplit[0]
+        this.response.status = requestLineSplit[1]
+        this.response.statusMsg = requestLineSplit[2]
+
+        this.response.headers = headers;
+
+        if (body) {
+            this.response.body = new Uint8Array(body.buffer, body.byteOffset, body.byteLength);
+        }
+
+
+        return this.response
     }
 }

@@ -1,5 +1,7 @@
 import { HttpRequest } from "./parser";
 import net from 'net';
+import { ServerContext } from "./server";
+import { Encoding, EncodingError } from "./encoding";
 
 interface Handler {
     path: string,
@@ -12,8 +14,9 @@ interface Handler {
 interface HttpResponse {
     status: number;
     statusMsg: string;
-    text: string;
+    text: Uint8Array<ArrayBufferLike>;
     responseHeaders: Record<string, string>
+
 }
 
 
@@ -22,17 +25,24 @@ export class Response {
     version: string;
     socket: net.Socket;
     headers: Record<string, string>
+    overrideHeaders: Record<string, string>
+    reqHeaders: Record<string, string>
+    econding: Encoding
 
-    constructor(version: string, socket: net.Socket) {
+    constructor(version: string, socket: net.Socket, reqHeaders: Record<string, string>) {
         this.res = {
             status: 200,
             statusMsg: "OK",
-            text: "",
+            text: new Uint8Array(),
             responseHeaders: {},
+
         }
         this.version = version
         this.socket = socket;
         this.headers = {}
+        this.overrideHeaders = {}
+        this.reqHeaders = reqHeaders
+        this.econding = new Encoding()
     }
 
     private getStatusMsg(status: number) {
@@ -59,38 +69,90 @@ export class Response {
         if (!text) {
             throw new Error("value is empty")
         }
-        this.res.text = text;
 
-        this.headers['Content-Length'] = String(text.length);
-        this.headers['Content-Type'] = 'text/plain'
+
+        const buffer = Buffer.from(text, 'utf-8');
+        this.res.text = new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+
+
 
         return this;
     }
 
     setHeader(name: string, val: string) {
-        this.res.responseHeaders[name] = val;
+        this.overrideHeaders[name] = val;
 
         return this;
     }
 
-    send() {
-        let headersString = '\r\n'
+    async sendAsync() {
 
-        for (const key in this.headers) {
-            headersString += key + ": "
-            headersString += this.headers[key] + "\r\n"
+
+        let text = this.res.text
+
+        if (this.reqHeaders['Accept-Encoding']) {
+            try {
+                const { encodedData, encoding } = await this.econding.encode(this.reqHeaders['Accept-Encoding'], text);
+                this.headers['Content-Encoding'] = encoding
+                text = encodedData;
+            } catch (err) {
+                if (!(err instanceof EncodingError)) {
+                    throw err;
+                }
+            }
         }
-        const response = this.version + " " + this.res.status + " " + this.res.statusMsg + headersString + "\r\n" + this.res.text;
 
+        this.headers['Content-Length'] = String(text.length);
+        this.headers['Content-Type'] = 'text/plain'
+
+
+
+        let headers: Record<string, string> = {}
+        for (const key in this.headers) {
+            headers[key] = this.headers[key]
+        }
+
+        for (const key in this.overrideHeaders) {
+            headers[key] = this.overrideHeaders[key]
+        }
+        let headersString = '\r\n'
+        for (const key in headers) {
+            headersString += key + ": "
+            headersString += headers[key] + "\r\n"
+        }
+
+
+
+
+        const response = this.version + " " + this.res.status + " " + this.res.statusMsg + headersString + "\r\n";
+
+        const versionNumber = this.version.split("/");
         this.socket.write(response);
-        this.socket.end()
-        this.socket.destroy()
+        const resp = this.socket.write(text)
+        if (Number(versionNumber[1]) < 1.1 || this.reqHeaders['Connection'] == "close") {
+            console.log("end connnection??")
+            console.log("end connnection??")
+            console.log("end connnection??")
+            this.socket.end()
+        }
+
+        console.log("did it flush")
+        console.log(resp)
+
+    }
+
+    send() {
+
+        this.sendAsync()
+
     }
 }
 
 
 
-interface Context { }
+interface Context {
+    directory: string
+}
 
 export class Router {
     handlers: Handler[]
@@ -124,18 +186,20 @@ export class Router {
     }
 
 
-    handleRequest(req: HttpRequest, socket: net.Socket) {
+    handleRequest(req: HttpRequest, socket: net.Socket, context: ServerContext) {
 
-        const response = new Response(req.version, socket);
+        const response = new Response(req.version, socket, req.headers);
         for (const handler of this.handlers) {
-            const match = req.path.match(handler.normalizedPathRegex);
+            const pathMatchRegex = req.path.match(handler.normalizedPathRegex);
 
-            if (match) {
-                const pathParams = this.extractParams(handler, req.path, match);
+            if (pathMatchRegex && req.method == handler.method) {
+                const pathParams = this.extractParams(handler, req.path, pathMatchRegex);
                 req.pathParam = pathParams;
 
-                const context = {}
-                handler.callback(req, response, context);
+                const reqContext: Context = {
+                    directory: context.directory
+                }
+                handler.callback(req, response, reqContext);
                 return;
             }
         }
