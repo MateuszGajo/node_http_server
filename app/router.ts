@@ -107,6 +107,17 @@ export class Response {
 
 
 
+
+
+        const versionNumber = this.version.split("/");
+
+        let shouldConnectionClose = false
+        if (Number(versionNumber[1]) < 1.1 || this.reqHeaders['Connection'] == "close") {
+
+            shouldConnectionClose = true
+            this.headers['Connection'] = 'close'
+        }
+
         let headers: Record<string, string> = {}
         for (const key in this.headers) {
             headers[key] = this.headers[key]
@@ -121,23 +132,13 @@ export class Response {
             headersString += headers[key] + "\r\n"
         }
 
-
-
-
         const response = this.version + " " + this.res.status + " " + this.res.statusMsg + headersString + "\r\n";
 
-        const versionNumber = this.version.split("/");
         this.socket.write(response);
-        const resp = this.socket.write(text)
-        if (Number(versionNumber[1]) < 1.1 || this.reqHeaders['Connection'] == "close") {
-            console.log("end connnection??")
-            console.log("end connnection??")
-            console.log("end connnection??")
+        this.socket.write(text)
+        if (shouldConnectionClose) {
             this.socket.end()
         }
-
-        console.log("did it flush")
-        console.log(resp)
 
     }
 

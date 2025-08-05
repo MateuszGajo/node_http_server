@@ -16,7 +16,6 @@ export interface HttpResponse {
     body: Uint8Array<ArrayBufferLike>
 }
 
-
 export class Parser {
 
     request: HttpRequest = {
@@ -70,7 +69,7 @@ export class Parser {
             let keyValue = String(item).split(":").map(item => item.trim())
             headers[keyValue[0]] = keyValue[1]
         }
-        const body = bufferSplited.shift();
+
 
         const requestLineSplit = requestLine.split(" ");
         if (requestLineSplit.length != 3) {
@@ -81,8 +80,15 @@ export class Parser {
         this.request.path = requestLineSplit[1]
         this.request.version = requestLineSplit[2]
 
+        const body = bufferSplited.shift();
+
+        const contentLength = headers['Content-Length']?.trim();
+
         this.request.headers = headers;
-        if (body) {
+
+
+
+        if (body && body.length == Number(contentLength)) {
             this.request.body = new Uint8Array(body.buffer, body.byteOffset, body.byteLength);
         }
 

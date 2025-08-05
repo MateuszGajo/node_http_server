@@ -11,6 +11,7 @@ const getData = (socket: net.Socket): Promise<Buffer> => new Promise((resolve, r
 
     socket.on('data', (chunk: Buffer) => {
         response = chunk
+        // need to better handle this, check if whole request its here!!
         resolve(chunk)
     });
 
@@ -110,7 +111,7 @@ describe("E2E", () => {
         server.setDirectory(directory)
 
 
-        socket.write(`POST /files/${filename} HTTP/1.0\r\n\r\n${fileData}`);
+        socket.write(`POST /files/${filename} HTTP/1.0\r\n\Content-Type: application/octet-stream\r\nContent-Length: ${fileData.length}\r\n\r\n${fileData}`);
         const data = String(await getData(socket));
 
         const readFileData = fs.readFileSync("/tmp/" + filename)
@@ -169,6 +170,8 @@ describe("E2E", () => {
 
         socket.write("GET /echo/abc HTTP/1.1\r\n\r\n");
         data = String(await getData(socket));
+        console.log("two???")
+        console.log(data)
 
         expect(data).toContain('HTTP/1.1 200 OK\r\n');
         expect(data).toContain('Content-Type: text/plain');
@@ -177,5 +180,24 @@ describe("E2E", () => {
     })
 
 
+    it("Should close connection when send header", async () => {
+        socket.write("GET /echo/abc HTTP/1.1\r\nConnection: close\r\n\r\n");
+        let data = String(await getData(socket));
+
+        expect(data).toContain('HTTP/1.1 200 OK\r\n');
+        expect(data).toContain('Content-Type: text/plain');
+        expect(data).toContain('Content-Length: 3');
+        expect(data).toContain('Connection: close');
+        expect(data).toContain('\r\n\r\nabc');
+
+        const wasClosed = await new Promise((res, rej) => {
+            socket.on('end', () => res(true))
+            socket.on('close', () => res(true))
+
+            setTimeout(() => res(false), 100)
+        })
+
+        expect(wasClosed).toBe(true)
+    })
 
 })
